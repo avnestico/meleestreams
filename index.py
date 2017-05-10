@@ -16,15 +16,18 @@ client_id = os.environ["client_id"]
 
 client = Twython(consumer_key, consumer_secret, access_token_key, access_token_secret)
 
+valid_netlocs = ["twitch.tv", "www.twitch.tv", "m.twitch.tv"]
 MINUTE_DELAY = 15
 
 
 def handler(event, context):
-    results = client.get_home_timeline(count=200)
-    print("found", str(len(results)), "tweets")
+    results = client.get_home_timeline(count=200, exclude_replies=False)
+    print("Found", str(len(results)), "tweets")
+
+    curr_time = datetime.utcnow()
 
     r = requests.get('https://api.twitch.tv/kraken/streams/?game=Super%20Smash%20Bros.%20Melee',
-                     headers={'Accept': 'application/vnd.twitchtv.v5+json',
+                     headers={'Accept':    'application/vnd.twitchtv.v5+json',
                               'Client-ID': client_id})
     stream_dict = r.json()
 
@@ -33,20 +36,26 @@ def handler(event, context):
         channels.append(stream["channel"]["name"])
     print(channels)
 
-    for tweet in results:
+    for tweet in results[::-1]:
         try:
             media_url = tweet["entities"]["urls"][0]["expanded_url"]
             parsed = urlparse(media_url)
-            netloc = parsed[1]
+            netloc = parsed[1].lower()
             path = parsed[2].replace("/", "")
-            if netloc.endswith("twitch.tv") and path in channels:
-                created_at = datetime.strptime(tweet["created_at"], "%a %b %d %H:%M:%S +0000 %Y")
-                tdelta = datetime.now() - created_at
-                if tdelta.seconds <= MINUTE_DELAY * 60:
-                    try:
+
+            created_at = datetime.strptime(tweet["created_at"], "%a %b %d %H:%M:%S +0000 %Y")
+            tdelta = curr_time - created_at
+
+            if tdelta.total_seconds() <= MINUTE_DELAY * 60 and netloc in valid_netlocs:
+                try:
+                    if path in channels:
                         client.retweet(id=tweet["id"])
-                    except TwythonError as e:
-                        print(e)
+                        print("RT:", tweet["text"])
+                    else:
+                        client.post('statuses/unretweet/%s' % tweet["id"])
+                        print("URT:", tweet["text"])
+                except TwythonError as e:
+                    print(e)
 
         except (KeyError, IndexError):
             pass
