@@ -2,11 +2,11 @@ from __future__ import print_function
 
 import os
 
-import requests
 from datetime import datetime
-from twython import Twython
-from twython.exceptions import TwythonError
 from urlparse import urlparse
+
+import requests
+from twython import Twython, TwythonError
 
 consumer_key = os.environ["consumer_key"]
 consumer_secret = os.environ["consumer_secret"]
@@ -20,6 +20,21 @@ valid_netlocs = ["twitch.tv", "www.twitch.tv", "m.twitch.tv"]
 MINUTE_DELAY = 15
 
 
+def get_channels(stream_dict):
+    channels = []
+    for stream in stream_dict["streams"]:
+        channels.append(stream["channel"]["name"])
+    print(channels)
+    return channels
+
+
+def get_urls(url_list):
+    media_urls = []
+    for url in url_list:
+        media_urls.append(url["expanded_url"])
+    return media_urls
+
+
 def handler(event, context):
     results = client.get_home_timeline(count=200, exclude_replies=False)
     print("Found", str(len(results)), "tweets")
@@ -29,36 +44,33 @@ def handler(event, context):
     r = requests.get('https://api.twitch.tv/kraken/streams/?game=Super%20Smash%20Bros.%20Melee',
                      headers={'Accept':    'application/vnd.twitchtv.v5+json',
                               'Client-ID': client_id})
-    stream_dict = r.json()
-
-    channels = []
-    for stream in stream_dict["streams"]:
-        channels.append(stream["channel"]["name"])
-    print(channels)
+    channels = get_channels(r.json())
 
     for tweet in results[::-1]:
-        try:
-            media_url = tweet["entities"]["urls"][0]["expanded_url"]
-            parsed = urlparse(media_url)
-            netloc = parsed[1].lower()
-            path = parsed[2].replace("/", "")
+        created_at = datetime.strptime(tweet["created_at"], "%a %b %d %H:%M:%S +0000 %Y")
+        tdelta = curr_time - created_at
 
-            created_at = datetime.strptime(tweet["created_at"], "%a %b %d %H:%M:%S +0000 %Y")
-            tdelta = curr_time - created_at
+        if tdelta.total_seconds() <= MINUTE_DELAY * 60:
+            rt_status = False
+            media_urls = get_urls(tweet["entities"]["urls"])
 
-            if tdelta.total_seconds() <= MINUTE_DELAY * 60 and netloc in valid_netlocs:
-                try:
-                    if path in channels:
-                        client.retweet(id=tweet["id"])
-                        print("RT:", tweet["text"])
-                    else:
-                        client.post('statuses/unretweet/%s' % tweet["id"])
-                        print("URT:", tweet["text"])
-                except TwythonError as e:
-                    print(e)
+            for media_url in media_urls:
+                parsed = urlparse(media_url)
+                netloc = parsed[1].lower()
+                path = parsed[2].replace("/", "")
+                if netloc in valid_netlocs and path in channels:
+                    rt_status = True
 
-        except (KeyError, IndexError):
-            pass
+            try:
+                if rt_status:
+                    client.retweet(id=tweet["id"])
+                    print("RT:", media_urls)
+                elif media_urls:
+                    client.post('statuses/unretweet/%s' % tweet["id"])
+                    print("URT:", media_urls)
+            except TwythonError as e:
+                print(e)
+
 
 if __name__ == "__main__":
     handler(None, None)
