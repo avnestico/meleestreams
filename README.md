@@ -1,7 +1,12 @@
-# polyglot-twitter-bot
-code for writing twitter bots in several languages
+# [@MeleeStreams](twitter.com/meleestreams)
 
-* Part 1: http://joelgrus.com/2015/12/29/polyglot-twitter-bot-part-1-nodejs/
-* Part 2: http://joelgrus.com/2015/12/29/polyglot-twitter-bot-part-2-nodejs-aws-lambda/
-* Part 3: http://joelgrus.com/2015/12/30/polyglot-twitter-bot-part-3-python-27-aws-lambda/
-* Part 4: http://joelgrus.com/2015/12/31/polyglot-twitter-bot-part-4-purescript/
+## This bot retweets Melee.
+
+A simple bot that retweets the people it follows when they tweet that they're live on Twitch.
+
+Hosted on AWS Lambda, with entry point [index.handler](https://github.com/avnestico/meleestreams/blob/master/index.py)
+
+Implementation details and base code thanks to [polyglot-twitter-bot](https://github.com/joelgrus/polyglot-twitter-bot):
+
+* http://joelgrus.com/2015/12/29/polyglot-twitter-bot-part-2-nodejs-aws-lambda/
+* http://joelgrus.com/2015/12/30/polyglot-twitter-bot-part-3-python-27-aws-lambda/
