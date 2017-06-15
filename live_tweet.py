@@ -9,7 +9,6 @@ def retweet(tweet, client):
         print(e)
 
 
-
 def unretweet(tweet, client):
     try:
         client.post('statuses/unretweet/%s' % tweet["id"])

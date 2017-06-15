@@ -1,17 +1,13 @@
 from __future__ import print_function
 
 import os
-
 from datetime import datetime, timedelta
 from urlparse import urlparse
 
-import math
 import requests
-from twython import Twython, TwythonError
+from twython import Twython
 
-# Only import one of these
-from dry_run import retweet, unretweet
-# from live_tweet import retweet, unretweet
+from live_tweet import retweet, unretweet
 
 game = "Super%20Smash%20Bros.%20Melee"
 username = "meleestreams"
@@ -24,10 +20,10 @@ client_id = os.environ["client_id"]
 client = Twython(consumer_key, consumer_secret, access_token_key, access_token_secret)
 valid_netlocs = ["twitch.tv", "www.twitch.tv", "m.twitch.tv"]
 
-curr_time = datetime.utcnow()
-
 RETWEET_WINDOW_MINS = 15
 URL_LOCKOUT_WINDOW_MINS = 60
+
+curr_time = datetime.utcnow()
 
 
 def get_twitch_channels():
@@ -38,7 +34,6 @@ def get_twitch_channels():
     stream_dict = r.json()
     for stream in stream_dict["streams"]:
         channels.append(stream["channel"]["name"])
-    #print(channels)
     return channels
 
 
@@ -49,7 +44,7 @@ def get_retweeted_tweets():
 
 def get_following_tweets():
     results = client.get_home_timeline(count=200, exclude_replies=False)
-    #print("Found", str(len(results)), "tweets")
+    print("Found", str(len(results)), "tweets")
     return results
 
 
@@ -84,15 +79,14 @@ def most_liked_tweet(tweets):
 
 
 def should_rt(tweet, channels):
-    rt_status = False
     media_urls = get_tweet_urls(tweet)
     for media_url in media_urls:
         parsed = urlparse(media_url)
         netloc = parsed[1].lower()
         path = parsed[2].replace("/", "")
         if netloc in valid_netlocs and path in channels:
-            rt_status = True
-    return rt_status
+            return True
+    return False
 
 
 def retweet_oldest_first(tweets):
@@ -103,9 +97,8 @@ def retweet_oldest_first(tweets):
 
 def unretweet_tweets(mt, channels):
     for tweet in mt:
-        tdelta = tweet_age(tweet)
-        if tdelta.total_seconds() <= RETWEET_WINDOW_MINS * 60:
-            if not should_rt(channels, tweet):
+        if tweet_age(tweet).total_seconds() <= RETWEET_WINDOW_MINS * 60:
+            if not should_rt(tweet, channels):
                 unretweet(tweet, client)
 
 
@@ -114,7 +107,7 @@ def retweet_tweets(mt, ft, channels):
 
     retweet_d = {}
     for tweet in ft:
-        if should_rt(tweet, channels):
+        if tweet_age(tweet).total_seconds() <= RETWEET_WINDOW_MINS * 60 and should_rt(tweet, channels):
             media_urls = get_tweet_urls(tweet)
             for url in media_urls:
                 if url not in retweeted_urls:
@@ -130,10 +123,16 @@ def retweet_tweets(mt, ft, channels):
     retweet_oldest_first(to_retweet)
 
 
-def handler(event, context):
+def get_data():
     my_tweets = get_retweeted_tweets()
     following_tweets = get_following_tweets()
     channels = get_twitch_channels()
+
+    return my_tweets, following_tweets, channels
+
+
+def handler(event, context):
+    my_tweets, following_tweets, channels = get_data()
 
     unretweet_tweets(my_tweets, channels)
     retweet_tweets(my_tweets, following_tweets, channels)
