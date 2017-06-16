@@ -5,9 +5,7 @@ from datetime import datetime, timedelta
 from urlparse import urlparse
 
 import requests
-from twython import Twython
-
-from live_tweet import retweet, unretweet
+from twython import Twython, TwythonError
 
 game = "Super%20Smash%20Bros.%20Melee"
 username = "meleestreams"
@@ -136,6 +134,20 @@ def handler(event, context):
 
     unretweet_tweets(my_tweets, channels)
     retweet_tweets(my_tweets, following_tweets, channels)
+
+def retweet(tweet, client):
+    try:
+        client.retweet(id=tweet["id"])
+        print("RT:", tweet["text"])
+    except TwythonError as e:
+        print(e)
+
+def unretweet(tweet, client):
+    try:
+        client.post('statuses/unretweet/%s' % tweet["id"])
+        print("URT:", tweet["text"])
+    except TwythonError as e:
+        print(e)
 
 
 if __name__ == "__main__":

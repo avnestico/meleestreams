@@ -4,11 +4,9 @@ import os
 import unittest
 
 import datetime
-import mock
+from mock import patch, Mock
 
 import index
-import live_tweet
-import dry_run
 
 
 def export_data(file, data):
@@ -39,7 +37,7 @@ def mock_unretweet(tweet, _):
 
 
 class TestTweets(unittest.TestCase):
-    @unittest.skip("Data export")
+    @unittest.skip("Don't need to export data")
     def test_export(self):
         my_tweets, following_tweets, channels = index.get_data()
         print(channels)
@@ -52,15 +50,64 @@ class TestTweets(unittest.TestCase):
         assert "http://twitch.tv/showdowngg" in index.get_tweet_urls(ft[0])
         assert c[0] == "showdowngg"
 
-    @mock.patch('index.retweet', side_effect=mock_retweet)
-    @mock.patch('index.tweet_age', value=datetime.timedelta(seconds=30))
-    def test_retweet(self, mock1, mock2):
+    @patch('index.retweet', side_effect=mock_retweet)
+    @patch('index.tweet_age', return_value=datetime.timedelta(seconds=30))
+    def test_retweet(self, _, mock2):
         mt, ft, c = import_data("retweet")
         index.retweet_tweets(mt, ft, c)
-        mock.Mock.assert_called_once(mock1)
+        Mock.assert_called_once(mock2)
 
-    def test_unretweet(self):
-        pass
+    @patch('index.retweet', side_effect=mock_retweet)
+    @patch('index.tweet_age', return_value=datetime.timedelta(minutes=30))
+    def test_dont_retweet_old(self, _, mock2):
+        mt, ft, c = import_data("retweet")
+        index.retweet_tweets(mt, ft, c)
+        Mock.assert_not_called(mock2)
+
+    @patch('index.retweet', side_effect=mock_retweet)
+    @patch('index.tweet_age', return_value=datetime.timedelta(seconds=30))
+    def test_dont_retweet_dead(self, _, mock2):
+        mt, ft, c = import_data("dont_retweet")
+        index.retweet_tweets(mt, ft, c)
+        Mock.assert_not_called(mock2)
+
+    @patch('index.unretweet', side_effect=mock_unretweet)
+    @patch('index.tweet_age', return_value=datetime.timedelta(seconds=30))
+    def test_unretweet(self, _, mock2):
+        mt, _, c = import_data("unretweet")
+        index.unretweet_tweets(mt, c)
+        Mock.assert_called_once(mock2)
+
+    @patch('index.unretweet', side_effect=mock_unretweet)
+    @patch('index.tweet_age', return_value=datetime.timedelta(minutes=30))
+    def test_keep_retweet_old(self, _, mock2):
+        mt, _, c = import_data("unretweet")
+        index.unretweet_tweets(mt, c)
+        Mock.assert_not_called(mock2)
+
+    @patch('index.unretweet', side_effect=mock_unretweet)
+    @patch('index.tweet_age', return_value=datetime.timedelta(seconds=30))
+    def test_keep_retweet_live(self, _, mock2):
+        mt, _, c = import_data("keep_retweet")
+        index.unretweet_tweets(mt, c)
+        Mock.assert_not_called(mock2)
+
+    @patch('index.retweet', side_effect=mock_retweet)
+    @patch('index.unretweet', side_effect=mock_unretweet)
+    def test_retweet_compound(self, _, mock2):
+        index.curr_time = datetime.datetime(year=2017, month=6, day=14, hour=2, minute=20)
+        mt, ft, c = import_data("compound")
+        index.retweet_tweets(mt, ft, c)
+        Mock.assert_called_once_with(mock2, ft[1], index.client)
+
+    @patch('index.retweet', side_effect=mock_retweet)
+    @patch('index.unretweet', side_effect=mock_unretweet)
+    def test_dont_retweet_compound(self, _, mock2):
+        index.curr_time = datetime.datetime(year=2017, month=6, day=14, hour=2, minute=0)
+        mt, ft, c = import_data("compound")
+        index.retweet_tweets(mt, ft, c)
+        Mock.assert_not_called(mock2)
+
 
 if __name__ == '__main__':
     unittest.main()
