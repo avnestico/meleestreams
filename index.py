@@ -79,12 +79,21 @@ def most_liked_tweet(tweets):
 def should_rt(tweet, channels):
     media_urls = get_tweet_urls(tweet)
     for media_url in media_urls:
-        parsed = urlparse(media_url)
-        netloc = parsed[1].lower()
-        path = parsed[2].replace("/", "")
-        if netloc in valid_netlocs and path in channels:
+        if is_twitch_url(media_url) and path_in_channels(media_url, channels):
             return True
     return False
+
+
+def is_twitch_url(url):
+    parsed = urlparse(url)
+    netloc = parsed[1].lower()
+    return netloc in valid_netlocs
+
+
+def path_in_channels(url, channels):
+    parsed = urlparse(url)
+    path = parsed[2].replace("/", "")
+    return path in channels
 
 
 def retweet_oldest_first(tweets):
@@ -108,7 +117,7 @@ def retweet_tweets(mt, ft, channels):
         if tweet_age(tweet).total_seconds() <= RETWEET_WINDOW_MINS * 60 and should_rt(tweet, channels):
             media_urls = get_tweet_urls(tweet)
             for url in media_urls:
-                if url not in retweeted_urls:
+                if is_twitch_url(url) and url not in retweeted_urls:
                     if url not in retweet_d:
                         retweet_d[url] = []
                     retweet_d[url].append(tweet)
@@ -135,12 +144,14 @@ def handler(event, context):
     unretweet_tweets(my_tweets, channels)
     retweet_tweets(my_tweets, following_tweets, channels)
 
+
 def retweet(tweet, client):
     try:
         client.retweet(id=tweet["id"])
         print("RT:", tweet["text"])
     except TwythonError as e:
         print(e)
+
 
 def unretweet(tweet, client):
     try:

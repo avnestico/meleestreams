@@ -41,9 +41,9 @@ class TestTweets(unittest.TestCase):
     def test_export(self):
         my_tweets, following_tweets, channels = index.get_data()
         print(channels)
-        export_data("mt.txt", my_tweets)
-        export_data("ft.txt", following_tweets)
-        export_data("ch.txt", channels)
+        export_data("my_tweets.txt", my_tweets)
+        export_data("following_tweets.txt", following_tweets)
+        export_data("channels.txt", channels)
 
     def test_open(self):
         _, ft, c = import_data(par="retweet")
@@ -51,23 +51,30 @@ class TestTweets(unittest.TestCase):
         assert c[0] == "showdowngg"
 
     @patch('index.retweet', side_effect=mock_retweet)
-    @patch('index.tweet_age', return_value=datetime.timedelta(seconds=30))
-    def test_retweet(self, _, mock2):
+    def test_retweet(self, mock2):
+        index.curr_time = datetime.datetime(year=2017, month=6, day=14, hour=3, minute=5)
         mt, ft, c = import_data("retweet")
         index.retweet_tweets(mt, ft, c)
         Mock.assert_called_once(mock2)
 
     @patch('index.retweet', side_effect=mock_retweet)
-    @patch('index.tweet_age', return_value=datetime.timedelta(minutes=30))
-    def test_dont_retweet_old(self, _, mock2):
+    def test_dont_retweet_old(self, mock2):
+        index.curr_time = datetime.datetime(year=2017, month=6, day=14, hour=3, minute=25)
         mt, ft, c = import_data("retweet")
         index.retweet_tweets(mt, ft, c)
         Mock.assert_not_called(mock2)
 
     @patch('index.retweet', side_effect=mock_retweet)
-    @patch('index.tweet_age', return_value=datetime.timedelta(seconds=30))
-    def test_dont_retweet_dead(self, _, mock2):
+    def test_dont_retweet_dead(self, mock2):
+        index.curr_time = datetime.datetime(year=2017, month=6, day=14, hour=3, minute=5)
         mt, ft, c = import_data("dont_retweet")
+        index.retweet_tweets(mt, ft, c)
+        Mock.assert_not_called(mock2)
+
+    @patch('index.retweet', side_effect=mock_retweet)
+    def test_dont_retweet_already_rtd(self, mock2):
+        index.curr_time = datetime.datetime(year=2017, month=6, day=16, hour=20, minute=30)
+        mt, ft, c = import_data("dont_retweet_already_rtd")
         index.retweet_tweets(mt, ft, c)
         Mock.assert_not_called(mock2)
 
